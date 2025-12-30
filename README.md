@@ -21,15 +21,3 @@ AZURE_CONTAINER_NAME=documents
 # 4. Run the API
 Run this command in PowerShell ---> python main.py
 
-# File Structure
-├── app/
-│   ├── database/       # DB Connections (AWS) & Storage (Azure) logic
-│   ├── models/         # SQLAlchemy Database Models
-│   ├── routers/        # API route handlers (Users, Documents)
-│   └── schemas/        # Pydantic data validation schemas
-├── main.py             # App entry point & startup initialization
-├── .env                # Private Credentials (STRICTLY IGNORED BY GIT)
-├── .gitignore          # Rules to exclude venv/ and .env
-└── requirements.txt    # List of project dependencies
-
-
