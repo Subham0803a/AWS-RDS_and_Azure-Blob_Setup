@@ -1,0 +1,10 @@
+# Environments
+venv/
+.env
+
+# Python Bytecode (temporary files)
+__pycache__/
+*.py[cod]
+
+# IDE Specific
+.vscode/
