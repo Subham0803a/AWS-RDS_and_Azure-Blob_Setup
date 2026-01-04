@@ -1,65 +1,62 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List
-from .. import models, schemas
+from app.models.model import User, Document
+from app.schemas.schema import DocumentResponse
 from app.database.connection import get_db
 from app.database.azure_blob import get_azure_storage, AzureBlobStorage
+from app.utils.dependencies import get_current_user
 import uuid
 
-router = APIRouter(prefix="/documents", tags=["documents"])
 
-@router.post("/upload", response_model=schemas.DocumentResponse)
+router = APIRouter(prefix="/documents", tags=["Documents"])
+
+
+@router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
     file: UploadFile = File(...),
-    user_id: int = Form(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     azure_storage: AzureBlobStorage = Depends(get_azure_storage)
 ):
-    """Upload a document to Azure Blob Storage"""
+    """Upload a document to Azure Blob Storage (Protected route)"""
     
-    # Define allowed MIME types (Images and PDFs only)
+    # Define allowed MIME types
     ALLOWED_TYPES = [
         "image/jpeg", 
         "image/png", 
         "image/gif", 
         "application/pdf",
         "application/msword", 
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" # .docx
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     ]
 
-    # Check if the uploaded file type is allowed
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400, 
-            detail=f"File type {file.content_type} is not supported. Only images and documents are allowed."
+            detail=f"File type {file.content_type} is not supported."
         )
-
-    # Verify user exists
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
     
     try:
         file_content = await file.read()
         file_size = len(file_content)
         
-        # Limit file size (e.g., max 10MB)
         if file_size > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File is too large (Max 10MB)")
 
         file_extension = file.filename.split('.')[-1] if '.' in file.filename else ''
-        blob_name = f"{user_id}/{uuid.uuid4()}.{file_extension}"
+        blob_name = f"{current_user.id}/{uuid.uuid4()}.{file_extension}"
         
-        # Upload to Azure Blob Storage
+        # Upload to Azure
         blob_url = azure_storage.upload_file(
             file_data=file_content,
             blob_name=blob_name,
             content_type=file.content_type or "application/octet-stream"
         )
         
-        # Save document metadata to database
-        new_document = models.Document(
-            user_id=user_id,
+        # Save to database
+        new_document = Document(
+            user_id=current_user.id,
             original_filename=file.filename,
             blob_name=blob_name,
             blob_url=blob_url,
@@ -76,47 +73,57 @@ async def upload_document(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
-@router.get("", response_model=List[schemas.DocumentResponse])
-def get_documents(
-    user_id: int = None,
+
+@router.get("", response_model=List[DocumentResponse])
+def get_my_documents(
     skip: int = 0,
     limit: int = 10,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all documents or filter by user_id"""
-    query = db.query(models.Document)
+    """Get all documents for the current user"""
+    documents = db.query(Document).filter(
+        Document.user_id == current_user.id
+    ).offset(skip).limit(limit).all()
     
-    if user_id:
-        query = query.filter(models.Document.user_id == user_id)
-    
-    documents = query.offset(skip).limit(limit).all()
     return documents
 
 
-@router.get("/{document_id}", response_model=schemas.DocumentResponse)
-def get_document(document_id: int, db: Session = Depends(get_db)):
-    """Get a specific document by ID"""
-    document = db.query(models.Document).filter(models.Document.id == document_id).first()
+@router.get("/{document_id}", response_model=DocumentResponse)
+def get_document(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a specific document"""
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+    
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+    
     return document
 
 
 @router.get("/{document_id}/download")
 async def download_document(
     document_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     azure_storage: AzureBlobStorage = Depends(get_azure_storage)
 ):
-    """Download a document from Azure Blob Storage"""
+    """Download a document"""
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
     
-    # Get document metadata from database
-    document = db.query(models.Document).filter(models.Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
     try:
-        # Download from Azure Blob Storage
         file_content = azure_storage.download_file(document.blob_name)
         
         from fastapi.responses import Response
@@ -128,41 +135,31 @@ async def download_document(
             }
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error downloading file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 
 @router.delete("/{document_id}")
 def delete_document(
     document_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     azure_storage: AzureBlobStorage = Depends(get_azure_storage)
 ):
-    """Delete a document from both database and Azure Blob Storage"""
+    """Delete a document"""
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
     
-    document = db.query(models.Document).filter(models.Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
     try:
-        # Delete from Azure Blob Storage
         azure_storage.delete_file(document.blob_name)
-        
-        # Delete from database
         db.delete(document)
         db.commit()
         
         return {"message": "Document deleted successfully"}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting document: {str(e)}")
-
-
-@router.get("/{user_id}/list", response_model=List[schemas.DocumentResponse])
-def list_user_documents(user_id: int, db: Session = Depends(get_db)):
-    """List all documents for a specific user"""
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    documents = db.query(models.Document).filter(models.Document.user_id == user_id).all()
-    return documents
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

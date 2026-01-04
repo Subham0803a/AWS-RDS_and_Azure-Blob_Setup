@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Verification</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            text-align: center;
+            color: white;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .content {
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .otp-box {
+            background-color: #f8f9fa;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 30px 0;
+            display: inline-block;
+        }
+        .otp-code {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .info-text {
+            color: #666;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🔐 Skynet</h1>
+        </div>
+        <div class="content">
+            <h2>Hello, {{ user_name }}!</h2>
+            <p>We received a request to verify your account. Use the OTP code below:</p>
+            
+            <div class="otp-box">
+                <div class="otp-code">{{ otp }}</div>
+            </div>
+            
+            <p class="info-text">This code will expire in <strong>10 minutes</strong>.</p>
+            
+            <div class="warning">
+                <strong>⚠️ Security Notice:</strong> Never share this code with anyone. Skynet will never ask for your OTP via phone or email.
+            </div>
+            
+            <p class="info-text">If you didn't request this code, please ignore this email or contact support.</p>
+        </div>
+        <div class="footer">
+            <p>© 2026 Skynet. All rights reserved.</p>
+            <p>This is an automated message, please do not reply.</p>
+        </div>
+    </div>
+</body>
+</html>
