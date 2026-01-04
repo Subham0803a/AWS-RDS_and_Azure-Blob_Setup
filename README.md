@@ -7,7 +7,7 @@ python -m venv venv
 .\venv\Scripts\Activate.ps1
 
 # Install required libraries
-pip install -r requirement.txt 
+pip install -r requirements.txt 
 
 # 3. Add .env & Your Keys
 
